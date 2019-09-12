@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+
+import sys
+
+first_line = True
+state = "IA LINK"
+
+ia_id = None
+match_quality = None
+
+matches = set()
+
+for line in sys.stdin:
+    if first_line:
+        # Eat the header line
+        first_line = False
+        continue
+
+    if not line.strip():
+        continue
+
+    row = line.strip().split("\t")
+    link = row[3]
+    if state == "IA LINK":
+        if "archive.org" not in link:
+            raise Exception.new(line.strip())
+
+        ia_id = link.split('/')[-1]
+        match_quality = row[4]
+        state = "CCE ID"
+    elif state == "CCE ID":
+        matches.add((ia_id, link, match_quality))
+        state = "IA LINK"
+        ia_id = None
+        match_quality = None
+    else:
+        raise Exception.new("NO STATE!")
+
+
+print("\t".join(("ia_id", "cce_id", "match_quality")))
+for match in matches:
+    print("\t".join(match))

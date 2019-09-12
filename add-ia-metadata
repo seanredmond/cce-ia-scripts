@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+
+import csv
+import lccnorm
+import requests
+import sys
+
+
+def extract_oclc(md):
+    if not md:
+        return "∅"
+
+    if isinstance(md, str):
+        return extract_oclc([md])
+
+    oclcs = [o.split(":")[-1] for o in md if "urn:oclc:record" in o]
+
+    if oclcs:
+        return (";").join(oclcs)
+
+    return "∅"
+
+
+def norm_lccn(lccn):
+    if lccn is None:
+        return None
+
+    if isinstance(lccn, list):
+        return ";".join(set([lccnorm.normalize(l) for l in lccn]))
+
+    return lccnorm.normalize(lccn)
+
+
+def extract_identifiers(md):
+    return {"lccn": norm_lccn(md["metadata"].get("lccn")),
+            "openlibrary": md["metadata"].get("openlibrary"),
+            "oclc": extract_oclc(md["metadata"].get("external-identifier"))}
+
+
+def format_book(md):
+    author = md["metadata"].get("creator")
+    title = md["metadata"].get("title")
+    pub = md["metadata"].get("publisher")
+    date = md["metadata"].get("date")
+
+    return "{}, {}. {}, {}".format(author, title, pub, date)
+
+def get_ia_metadata(ia_id):
+    r = requests.get("https://archive.org/metadata/{}".format(ia_id))
+    r.raise_for_status()
+    return r.json()
+
+
+reader = csv.DictReader(sys.stdin, delimiter="\t")
+writer = csv.DictWriter(sys.stdout, delimiter="\t",
+                        fieldnames=['ia_id', 'cce_id', 'match_quality',
+                                    'ia-openlibrary', 'ia-lccn', 'ia-oclc'])
+writer.writeheader()
+for line in reader:
+    md = get_ia_metadata(line["ia_id"])
+    ids = extract_identifiers(md)
+
+    line["ia-openlibrary"] = ids["openlibrary"]
+    line["ia-lccn"] = ids["lccn"]
+    line["ia-oclc"] = ids["oclc"]
+    writer.writerow(line)
+    
