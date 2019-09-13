@@ -38,5 +38,5 @@ for line in sys.stdin:
 
 
 print("\t".join(("ia_id", "cce_id", "match_quality")))
-for match in matches:
+for match in sorted(matches, key=lambda x: (x[2], x[1]), reverse=True):
     print("\t".join(match))
