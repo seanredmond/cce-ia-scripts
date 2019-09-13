@@ -36,18 +36,20 @@ def extract_classify(xml):
              [work.attrib.get(f) for f in ["author", "title"]]
              if g is not None])
         return {"oclc-book": book,
-                "oclc-owi": work.attrib["owi"],
+                "oclc-owi": work.attrib.get("owi"),
                 "oclc-main-id": work.text,
-                "oclc-type": work.attrib["format"],
-                "oclc-editions": work.attrib["editions"],
-                "oclc-holdings": work.attrib["holdings"],
-                "oclc-eholdings": work.attrib["eholdings"]}
+                "oclc-type": work.attrib.get("format"),
+                "oclc-editions": work.attrib.get("editions"),
+                "oclc-holdings": work.attrib.get("holdings"),
+                "oclc-eholdings": work.attrib.get("eholdings")}
 
     if rc == 102:
         return {}
 
-    
 
+    if rc == 4:
+        return {"oclc-owi": "; ".join([w.attrib["owi"] for w in xml.findall(".//{http://classify.oclc.org}work")])}
+    
     raise Exception(
         "Classify response code {}".format(classify_response_code(xml)))
 
@@ -55,7 +57,9 @@ reader = csv.DictReader(sys.stdin, delimiter="\t")
 writer = csv.DictWriter(sys.stdout, delimiter="\t",
                         fieldnames=['ia_id', 'cce_id', 'match_quality',
                                     'ia-book', 'ia-date', 'ia-openlibrary',
-                                    'ia-lccn', 'ia-oclc', 'oclc-book',
+                                    'ia-lccn', 'ia-oclc', 'cce_id',
+				    'cce-regnum', 'cce-regdate',
+                                    'cce-newmatter', 'cce-entry', 'oclc-book',
                                     'oclc-owi', 'oclc-main-id', 'oclc-type',
                                     'oclc-editions', 'oclc-holdings',
                                     'oclc-eholdings'])
@@ -65,15 +69,15 @@ for line in reader:
     if line["ia-oclc"]:
         cfy = get_by_oclc(line["ia-oclc"])
     elif line["ia-lccn"]:
-        cfy = get_by_oclc(line["ia-lccn"])
+        cfy = get_by_lccn(line["ia-lccn"])
     else:
         cfy = {}
     
-    line["oclc-book"] = cfy.get("oclc-book")
-    line["oclc-owi"] = cfy.get("oclc-owi")
-    line["oclc-main-id"] = cfy.get("oclc-main-id")
-    line["oclc-type"] = cfy.get("oclc-type")
-    line["oclc-editions"] = cfy.get("oclc-editions")
-    line["oclc-holdings"] = cfy.get("oclc-holdings")
-    line["oclc-eholdings"] = cfy.get("oclc-eholdings")
-    writer.writerow(line)
+    # line["oclc-book"] = cfy.get("oclc-book")
+    # line["oclc-owi"] = cfy.get("oclc-owi")
+    # line["oclc-main-id"] = cfy.get("oclc-main-id")
+    # line["oclc-type"] = cfy.get("oclc-type")
+    # line["oclc-editions"] = cfy.get("oclc-editions")
+    # line["oclc-holdings"] = cfy.get("oclc-holdings")
+    # line["oclc-eholdings"] = cfy.get("oclc-eholdings")
+    writer.writerow({**line, **cfy})
