@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+
+import csv
+import os
+import psycopg2
+import psycopg2.extras
+import re
+import requests
+import sys
+
+
+def get_dates(oclc, cur):
+    cur.execute("""
+SELECT
+  min(oclc.leader_date1) AS first_date,
+  max(oclc.leader_date1) AS last_date,
+  array_to_string(array_agg(DISTINCT o2l.lccn ORDER BY o2l.lccn), '; ') AS nypl_circ_lccns,
+  'Full view' = ANY (array_agg(DISTINCT hi.us_rights)) AS hathi_full_view
+FROM
+  oclc
+  LEFT JOIN oclc.oclc2lccn o2l ON oclc.oclc = o2l.oclc_id
+  LEFT JOIN hathi2oclc h2o ON oclc.oclc = h2o.oclc
+  LEFT JOIN hathi_items hi ON h2o.hathi_id = hi.hathi_id
+WHERE
+  oclc.oclc in(
+    SELECT
+      oclc FROM owi2oclc
+    WHERE
+      owi in(
+        SELECT
+          owi FROM owi2oclc
+        WHERE
+          oclc = %s))
+  AND oclc.leader_date1 ~ '[0-9]{4}'""", [oclc])
+
+    row = cur.fetchone()
+    return {"oclc-first-date": row.get("first_date"),
+            "oclc-last-date": row.get("last_date"),
+            "oclc-lccns": row.get("lccns"),
+            "hathi-full-view": row.get("hathi_full_view")}
+
+
+def check_date(ia_d, oclc_d):
+    try:
+        norm_d = re.search(r"[0-9]{4}", ia_d)[0]
+        return {"has-older-date": int(oclc_d) < int(norm_d)}
+    except TypeError:
+        return {"has-older-date": None}
+
+
+conn = psycopg2.connect(dbname=os.environ['PGDATABASE'],
+                        user=os.environ['PGUSER'],
+                        password=os.environ['PGPASSWORD'],
+                        host=os.environ['PGHOST'])
+cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+reader = csv.DictReader(sys.stdin, delimiter="\t")
+writer = csv.DictWriter(sys.stdout, delimiter="\t",
+                        fieldnames=['ia_id', 'cce_id', 'match_quality',
+                                    'ia-book', 'ia-date', 'ia-openlibrary',
+                                    'ia-lccn', 'ia-oclc', 'cce_id',
+                                    'cce-regnum', 'cce-regdate',
+                                    'cce-newmatter', 'cce-entry', 'oclc-book',
+                                    'oclc-owi', 'oclc-main-id', 'oclc-type',
+                                    'oclc-editions', 'oclc-holdings',
+                                    'oclc-eholdings', 'oclc-first-date',
+                                    'oclc-last-date', 'has-older-date', 
+                                    'oclc-lccns', 'hathi-full-view'])
+writer.writeheader()
+
+for line in reader:
+    if line["oclc-main-id"]:
+        dates = get_dates(line["oclc-main-id"], cur)
+        writer.writerow({**line, **dates,
+                         **check_date(line['ia-date'],
+                                      dates['oclc-first-date'])})
+        continue
+
+    writer.writerow(line)

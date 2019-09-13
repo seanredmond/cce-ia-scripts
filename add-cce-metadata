@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+
+import csv
+import re
+import requests
+import sys
+
+API = "http://sfr-bardo-copyright-development.us-east-1.elasticbeanstalk.com/registration/"
+
+
+def has_new_matter(cce):
+    return "<newMatterClaimed>" in cce["data"]["xml"] \
+        or " NM:" in cce["data"]["xml"]
+
+def get_cce_metadata(cce_id):
+    try:
+        r = requests.get("{}{}".format(API, cce_id))
+        r.raise_for_status()
+    except requests.exceptions.HTTPError:
+        return {}
+    
+    md = r.json()
+    # if len(md["data"]["registrations"]) > 1:
+    #     raise Exception("{} has multiple registrations".format(cce_id))
+
+    return {"cce-regnum": md["data"]["registrations"][0]["number"],
+            "cce-regdate": md["data"]["registrations"][0]["date"],
+            "cce-newmatter": has_new_matter(md),
+            "cce-entry": re.sub(r'<[^>]+>', '', md["data"]["xml"]).strip()}
+                     
+
+
+reader = csv.DictReader(sys.stdin, delimiter="\t")
+writer = csv.DictWriter(sys.stdout, delimiter="\t",
+                        fieldnames=['ia_id', 'match_quality',
+                                    'ia-book', 'ia-date', 'ia-openlibrary',
+                                    'ia-lccn', 'ia-oclc', 'cce_id',
+				    'cce-regnum', 'cce-regdate',
+                                    'cce-newmatter', 'cce-entry'])
+				    
+writer.writeheader()
+for line in reader:
+    line = {**line, **get_cce_metadata(line["cce_id"])}
+
+    # ids = extract_identifiers(md)
+    
+
+    # line["ia-book"] = format_book(md)
+    # line["ia-date"] = join_if_list(md["metadata"].get("date"))
+    # line["ia-openlibrary"] = ids["openlibrary"]
+    # line["ia-lccn"] = ids["lccn"]
+    # line["ia-oclc"] = ids["oclc"]
+    writer.writerow(line)
