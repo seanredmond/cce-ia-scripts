@@ -4,7 +4,7 @@ import csv
 import lccnorm
 import requests
 import sys
-
+from globals import TSV_FIELDS
 
 def extract_oclc(md):
     if not md:
@@ -61,14 +61,11 @@ def get_ia_metadata(ia_id):
 
 reader = csv.DictReader(sys.stdin, delimiter="\t")
 writer = csv.DictWriter(sys.stdout, delimiter="\t",
-                        fieldnames=['ia_id', 'cce_id', 'match_quality',
-                                    'ia-book', 'ia-date', 'ia-openlibrary',
-                                    'ia-lccn', 'ia-oclc'])
+                        fieldnames=TSV_FIELDS)
 writer.writeheader()
 for line in reader:
     md = get_ia_metadata(line["ia_id"])
     ids = extract_identifiers(md)
-    
 
     line["ia-book"] = format_book(md)
     line["ia-date"] = join_if_list(md["metadata"].get("date"))
@@ -76,4 +73,3 @@ for line in reader:
     line["ia-lccn"] = ids["lccn"]
     line["ia-oclc"] = ids["oclc"]
     writer.writerow(line)
-    
