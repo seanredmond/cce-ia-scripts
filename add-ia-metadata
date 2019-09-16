@@ -6,6 +6,7 @@ import requests
 import sys
 from globals import TSV_FIELDS
 
+
 def extract_oclc(md):
     if not md:
         return None
@@ -34,7 +35,7 @@ def norm_lccn(lccn):
 def join_if_list(s):
     if s is None:
         return None
-    
+
     if isinstance(s, list):
         return "; ".join(s)
 
@@ -53,6 +54,7 @@ def format_book(md):
 
     return ", ".join([join_if_list(i) for i in info if i is not None])
 
+
 def get_ia_metadata(ia_id):
     r = requests.get("https://archive.org/metadata/{}".format(ia_id))
     r.raise_for_status()
@@ -64,12 +66,16 @@ writer = csv.DictWriter(sys.stdout, delimiter="\t",
                         fieldnames=TSV_FIELDS)
 writer.writeheader()
 for line in reader:
-    md = get_ia_metadata(line["ia_id"])
-    ids = extract_identifiers(md)
+    try:
+        md = get_ia_metadata(line["ia_id"])
+        ids = extract_identifiers(md)
 
-    line["ia-book"] = format_book(md)
-    line["ia-date"] = join_if_list(md["metadata"].get("date"))
-    line["ia-openlibrary"] = ids["openlibrary"]
-    line["ia-lccn"] = ids["lccn"]
-    line["ia-oclc"] = ids["oclc"]
-    writer.writerow(line)
+        line["ia-book"] = format_book(md)
+        line["ia-date"] = join_if_list(md["metadata"].get("date"))
+        line["ia-openlibrary"] = ids["openlibrary"]
+        line["ia-lccn"] = ids["lccn"]
+        line["ia-oclc"] = ids["oclc"]
+        writer.writerow(line)
+    except Exception:
+        print("Could not get metadata for {}".format(line["ia_id"]),
+              file=sys.stderr)
