@@ -4,6 +4,7 @@ import csv
 import requests
 import sys
 import xml.etree.ElementTree as ET
+from globals import TSV_FIELDS
 
 
 def classify_response_code(xml):
@@ -55,14 +56,7 @@ def extract_classify(xml):
 
 reader = csv.DictReader(sys.stdin, delimiter="\t")
 writer = csv.DictWriter(sys.stdout, delimiter="\t",
-                        fieldnames=['ia_id', 'cce_id', 'match_quality',
-                                    'ia-book', 'ia-date', 'ia-openlibrary',
-                                    'ia-lccn', 'ia-oclc', 'cce_id',
-				    'cce-regnum', 'cce-regdate',
-                                    'cce-newmatter', 'cce-entry', 'oclc-book',
-                                    'oclc-owi', 'oclc-main-id', 'oclc-type',
-                                    'oclc-editions', 'oclc-holdings',
-                                    'oclc-eholdings'])
+                        fieldnames=TSV_FIELDS)
 writer.writeheader()
 
 for line in reader:
@@ -72,12 +66,4 @@ for line in reader:
         cfy = get_by_lccn(line["ia-lccn"])
     else:
         cfy = {}
-    
-    # line["oclc-book"] = cfy.get("oclc-book")
-    # line["oclc-owi"] = cfy.get("oclc-owi")
-    # line["oclc-main-id"] = cfy.get("oclc-main-id")
-    # line["oclc-type"] = cfy.get("oclc-type")
-    # line["oclc-editions"] = cfy.get("oclc-editions")
-    # line["oclc-holdings"] = cfy.get("oclc-holdings")
-    # line["oclc-eholdings"] = cfy.get("oclc-eholdings")
     writer.writerow({**line, **cfy})
