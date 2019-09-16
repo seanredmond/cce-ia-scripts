@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+
+import csv
+import os
+import psycopg2
+import psycopg2.extras
+import sys
+from globals import TSV_FIELDS
+
+def get_hathi_items(owi, cur):
+    cur.execute("""
+SELECT DISTINCT
+    h2o.hathi_id,
+    hi.item_id
+FROM
+    owi2oclc o2o
+    LEFT JOIN hathi2oclc h2o ON o2o.oclc = h2o.oclc
+    LEFT JOIN hathi_items hi ON h2o.hathi_id = hi.hathi_id
+WHERE
+    o2o.owi = %s
+    AND hi.us_rights = 'Full view'
+    AND NOT h2o.is_error""", [owi])
+
+    return cur.fetchall()
+
+
+conn = psycopg2.connect(dbname=os.environ['PGDATABASE'],
+                        user=os.environ['PGUSER'],
+                        password=os.environ['PGPASSWORD'],
+                        host=os.environ['PGHOST'])
+cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+
+reader = csv.DictReader(sys.stdin, delimiter="\t")
+writer = csv.DictWriter(sys.stdout, delimiter="\t",
+                        fieldnames=["IA Description", "IA Link", "Hathi Item", "Hathi Catalog", "CCE Entry", "CCE Reg Num", "CCE Reg Date", "IA ID", "Hathi Record ID", "Hathi Item ID"])
+writer.writeheader()
+
+for line in reader:
+    if line["oclc-owi"]:
+        for owi in line["oclc-owi"].split("; "):
+            for hathi in get_hathi_items(owi, cur):
+                writer.writerow({"IA Description": line["ia-book"],
+                                 "IA Link": None,
+                                 "Hathi Item": None,
+                                 "Hathi Catalog": None,
+                                 "CCE Entry": line["cce-entry"],
+                                 "CCE Reg Num": line["cce-regnum"],
+                                 "CCE Reg Date": line["cce-regdate"],
+                                 "IA ID": line["ia_id"],
+                                 "Hathi Record ID": hathi["hathi_id"],
+                                 "Hathi Item ID": hathi["item_id"]})
